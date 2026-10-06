@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment: {POSTGRES_DB: opsagent, POSTGRES_USER: opsagent, POSTGRES_PASSWORD: opsagent}
+    volumes: [opsagent-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, pg_isready -U opsagent], interval: 5s, timeout: 5s, retries: 10}
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://opsagent:opsagent@db:5432/opsagent
+      CORS_ORIGINS: http://localhost:3003
+      MAX_TOOL_CALLS: 20
+      MAX_INCIDENT_COST_USD: 0.25
+    ports: [8003:8003]
+    depends_on: {db: {condition: service_healthy}}
+    healthcheck: {test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"], interval: 10s, timeout: 5s, retries: 5}
+  web:
+    build: ./frontend
+    ports: [3003:80]
+    depends_on: {api: {condition: service_healthy}}
+volumes: {opsagent-data: {}}
